@@ -1,0 +1,9 @@
+PyQt6>=6.6
+av>=12.0
+opencv-python-headless>=4.9
+requests>=2.31
+numpy>=1.26
+
+# Optional: Required only for audio playback (see the "Audio" README).
+# CamPlayer will run even without this package; audio will simply be skipped.
+sounddevice>=0.4.6
