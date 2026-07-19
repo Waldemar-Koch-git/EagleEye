@@ -1,4 +1,4 @@
-# Version 0.9
+# Version 0.91
 import logging
 import sys
 
@@ -8,6 +8,8 @@ from EagleEye.main_window import MainWindow
 
 
 def main():
+    """Application entry point: configure logging, start the Qt event loop
+    and show the main window."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName("EagleEye")

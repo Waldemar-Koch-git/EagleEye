@@ -9,6 +9,8 @@ from .stream_types import StreamType
 
 class StreamSettingsDialog(QtWidgets.QDialog):
     def __init__(self, config: StreamConfig = None, parent=None):
+        """Build the settings form for config, or for a fresh StreamConfig
+        with defaults if config is None (i.e. "add new camera")."""
         super().__init__(parent)
         self.setWindowTitle(tr("settings.title"))
         self.config = config or StreamConfig(
@@ -116,6 +118,8 @@ class StreamSettingsDialog(QtWidgets.QDialog):
         form.addRow(btns)
 
     def get_config(self) -> StreamConfig:
+        """Read the current form values back into self.config and return it.
+        Call after the dialog was accepted."""
         self.config.name = self.name_edit.text().strip() or tr("settings.fallback_name")
         self.config.url = self.url_edit.text().strip()
         self.config.stream_type = self.type_combo.currentData()

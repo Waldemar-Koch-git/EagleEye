@@ -29,6 +29,7 @@ class VideoWidget(QtWidgets.QWidget):
     ZOOM_STEP_FACTOR = 1.2
 
     def __init__(self, config: StreamConfig, buffer: LatestFrameBuffer, parent=None):
+        """Create the tile for one stream, wired to its LatestFrameBuffer."""
         super().__init__(parent)
         self.config = config
         self.buffer = buffer
@@ -88,19 +89,25 @@ class VideoWidget(QtWidgets.QWidget):
         self.update()
 
     def set_target_fps(self, fps: int):
+        """Set how often the display timer polls the buffer for a new
+        frame (1-60 Hz), independent of the source's actual frame rate."""
         fps = max(1, min(fps, 60))
         self._timer.setInterval(int(1000 / fps))
 
     @QtCore.pyqtSlot(str)
     def set_status(self, status: str):
+        """Update the connection status shown when no frame is available yet."""
         self._status = status
         self.update()
 
     def set_recording(self, recording: bool):
+        """Show or hide the "REC" indicator on the tile."""
         self._recording = recording
         self.update()
 
     def _refresh(self):
+        """Timer callback: pull the latest frame from the buffer (if a new
+        one has arrived) and trigger a repaint."""
         frame, fid, fps = self.buffer.get(self._last_frame_id)
         if frame is None:
             return
@@ -114,6 +121,8 @@ class VideoWidget(QtWidgets.QWidget):
         self.update()
 
     def paintEvent(self, event):
+        """Draw the current frame (cropped/scaled for zoom if active),
+        the name/variant label, FPS overlay and REC indicator."""
         painter = QtGui.QPainter(self)
         painter.fillRect(self.rect(), QtCore.Qt.GlobalColor.black)
 
@@ -168,6 +177,7 @@ class VideoWidget(QtWidgets.QWidget):
             painter.drawText(self.width() - 64, 16, tr("video.rec"))
 
     def mouseDoubleClickEvent(self, event):
+        """Emit doubleClicked so MainWindow can toggle single-tile fullscreen."""
         self.doubleClicked.emit(self.config.id)
         super().mouseDoubleClickEvent(event)
 
@@ -190,6 +200,8 @@ class VideoWidget(QtWidgets.QWidget):
         return QtCore.QRect(src_x, src_y, src_w, src_h)
 
     def wheelEvent(self, event):
+        """Ctrl+wheel zooms the displayed crop in/out, centered on the
+        cursor position; without Ctrl the event is passed through unchanged."""
         if not (event.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier):
             # Without Ctrl: no special behavior, pass event through normally
             super().wheelEvent(event)
@@ -229,12 +241,14 @@ class VideoWidget(QtWidgets.QWidget):
         event.accept()
 
     def reset_zoom(self):
+        """Reset zoom and pan back to the default 1x, centered view."""
         self._zoom = 1.0
         self._pan_x = 0.5
         self._pan_y = 0.5
         self.update()
 
     def is_zoomed(self) -> bool:
+        """Return True if the tile is currently zoomed in beyond 1x."""
         return self._zoom > 1.0001
 
     def _pan_by_widget_delta(self, dx_widget, dy_widget):
@@ -258,12 +272,15 @@ class VideoWidget(QtWidgets.QWidget):
         self.update()
 
     def sizeHint(self):
+        """Preferred initial tile size (16:9)."""
         return QtCore.QSize(320, 180)
 
     # Drag & Drop to reorder tiles in the grid. MainWindow._make_select_handler
     # patches mousePressEvent additionally for selection highlighting, but always
     # calls the method defined here (as "original") so drag detection is preserved.
     def mousePressEvent(self, event):
+        """Start either Ctrl+drag panning (while zoomed) or plain-drag
+        reordering, depending on modifiers and zoom state."""
         if (event.button() == QtCore.Qt.MouseButton.LeftButton
                 and event.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier
                 and self.is_zoomed()):
@@ -278,6 +295,8 @@ class VideoWidget(QtWidgets.QWidget):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
+        """Continue an active Ctrl+drag pan, or start a tile-reorder drag
+        once the mouse has moved far enough from the press position."""
         if self._panning and (event.buttons() & QtCore.Qt.MouseButton.LeftButton):
             pos = event.position()
             if self._pan_last_pos is not None:
@@ -294,6 +313,7 @@ class VideoWidget(QtWidgets.QWidget):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
+        """End an active Ctrl+drag pan."""
         if self._panning and event.button() == QtCore.Qt.MouseButton.LeftButton:
             self._panning = False
             self._pan_last_pos = None
@@ -303,6 +323,8 @@ class VideoWidget(QtWidgets.QWidget):
         super().mouseReleaseEvent(event)
 
     def _start_drag(self):
+        """Begin a Qt drag carrying this tile's stream id, so dropping it
+        onto another tile triggers a reorder via reorderRequested."""
         self._drag_start_pos = None
         drag = QtGui.QDrag(self)
         mime = QtCore.QMimeData()
@@ -316,10 +338,13 @@ class VideoWidget(QtWidgets.QWidget):
         drag.exec(QtCore.Qt.DropAction.MoveAction)
 
     def dragEnterEvent(self, event):
+        """Accept drags carrying another tile's stream id (for reordering)."""
         if event.mimeData().hasFormat("application/x-EagleEye-stream-id"):
             event.acceptProposedAction()
 
     def dropEvent(self, event):
+        """Complete a tile-reorder drag by emitting reorderRequested with
+        the dragged and target stream ids."""
         data = event.mimeData().data("application/x-EagleEye-stream-id")
         dragged_id = bytes(data).decode("utf-8")
         if dragged_id and dragged_id != self.config.id:

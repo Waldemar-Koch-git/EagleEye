@@ -15,6 +15,8 @@ class CameraManagerDialog(QtWidgets.QDialog):
     ]
 
     def __init__(self, main_window, parent=None):
+        """Build the non-modal camera overview table and start its
+        periodic auto-refresh timer."""
         super().__init__(parent)
         self.main_window = main_window
         self.setWindowTitle(tr("manager.title"))
@@ -65,6 +67,8 @@ class CameraManagerDialog(QtWidgets.QDialog):
         self.table.setHorizontalHeaderLabels(self._column_labels())
 
     def refresh(self):
+        """Rebuild the table rows from the main window's current stream
+        list. Called on a timer and after any add/edit/remove action."""
         self.setWindowTitle(tr("manager.title"))
         self.table.setHorizontalHeaderLabels(self._column_labels())
         mw = self.main_window
@@ -113,19 +117,23 @@ class CameraManagerDialog(QtWidgets.QDialog):
             3, QtWidgets.QHeaderView.ResizeMode.Stretch)
 
     def _on_row_double_clicked(self, row, _col):
+        """Open the settings dialog for the double-clicked row's camera."""
         if 0 <= row < len(self.main_window.order):
             sid = self.main_window.order[row]
             self._edit_camera(sid)
 
     def _add_camera(self):
+        """Open the "add camera" dialog and refresh the table afterwards."""
         self.main_window.add_stream_dialog()
         self.refresh()
 
     def _edit_camera(self, stream_id):
+        """Open the settings dialog for stream_id and refresh the table."""
         self.main_window.open_settings_for(stream_id)
         self.refresh()
 
     def _remove_camera(self, stream_id):
+        """Ask for confirmation, then remove stream_id and refresh the table."""
         cfg = self.main_window.streams.get(stream_id)
         name = cfg.name if cfg else stream_id
         reply = QtWidgets.QMessageBox.question(
@@ -137,5 +145,6 @@ class CameraManagerDialog(QtWidgets.QDialog):
             self.refresh()
 
     def closeEvent(self, event):
+        """Stop the auto-refresh timer when the dialog is closed."""
         self._timer.stop()
         super().closeEvent(event)

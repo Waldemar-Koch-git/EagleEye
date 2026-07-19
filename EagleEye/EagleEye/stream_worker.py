@@ -63,6 +63,12 @@ class StreamWorker(threading.Thread):
     frames to a LatestFrameBuffer. Automatically reconnects on errors."""
 
     def __init__(self, config: StreamConfig, buffer: LatestFrameBuffer, status_cb=None):
+        """Set up (but don't start) the decode thread for one stream.
+
+        status_cb, if given, is invoked as status_cb(stream_id, status_str,
+        extra_dict) from this worker thread whenever the connection state
+        changes (connecting/connected/error/reconnecting/...).
+        """
         super().__init__(daemon=True)
         self.config = config
         self.buffer = buffer
@@ -73,12 +79,15 @@ class StreamWorker(threading.Thread):
         self._recorder_lock = threading.Lock()
 
     def stop(self):
+        """Signal the decode loop to exit and stop any active recording."""
         self._stop_event.set()
         self.stop_recording()
 
     # Recording is independent of stream type; it hooks into the decoded frames
     # after post-processing.
     def start_recording(self, path):
+        """Start writing decoded frames to path as MP4, replacing any
+        recorder that is already running for this stream."""
         with self._recorder_lock:
             old = self._recorder
             self._recorder = StreamRecorder(path, fps=self.config.max_fps)
@@ -87,6 +96,7 @@ class StreamWorker(threading.Thread):
         self._report("recording_started", path=path)
 
     def stop_recording(self):
+        """Stop and close the active recorder, if any."""
         with self._recorder_lock:
             rec = self._recorder
             self._recorder = None
@@ -95,16 +105,19 @@ class StreamWorker(threading.Thread):
             self._report("recording_stopped")
 
     def is_recording(self):
+        """Return True while a recording is currently in progress."""
         with self._recorder_lock:
             return self._recorder is not None
 
     def _feed_recorder(self, frame):
+        """Pass a post-processed frame to the active recorder, if any."""
         with self._recorder_lock:
             rec = self._recorder
         if rec is not None:
             rec.write(frame)
 
     def _report(self, status, **extra):
+        """Forward a status update to the registered status_cb, if any."""
         if self.status_cb:
             try:
                 self.status_cb(self.config.id, status, extra)
@@ -112,6 +125,8 @@ class StreamWorker(threading.Thread):
                 logger.exception("status_cb error")
 
     def _resolve_type(self):
+        """Resolve StreamType.AUTO to a concrete type via detect_stream_type()
+        and cache the result; explicit types are returned unchanged."""
         st = self.config.effective_stream_type()
         if st == StreamType.AUTO:
             st = detect_stream_type(self.config.effective_url())
@@ -120,6 +135,9 @@ class StreamWorker(threading.Thread):
         return st
 
     def run(self):
+        """Thread entry point: repeatedly (re)resolve the stream type and
+        run the matching decode loop, reconnecting with a configurable
+        delay whenever a loop exits due to an error."""
         while not self._stop_event.is_set():
             st = self._resolve_type()
             try:
@@ -144,6 +162,8 @@ class StreamWorker(threading.Thread):
 
     # Snapshot JPEG: simple HTTP GET polling
     def _run_snapshot(self):
+        """Decode loop for snapshot_jpeg: repeatedly GET a single JPEG image
+        at the configured polling interval."""
         session = requests.Session()
         auth = self._auth()
         interval = max(0.02, self.config.snapshot_interval_ms / 1000.0)
@@ -173,6 +193,9 @@ class StreamWorker(threading.Thread):
     # MJPEG: manually parse multipart/x-mixed-replace (no FFmpeg needed,
     # making it lightweight and robust against broken boundaries)
     def _run_mjpeg(self):
+        """Decode loop for mjpeg: manually parse a multipart/x-mixed-replace
+        HTTP response into individual JPEG frames using their SOI/EOI byte
+        markers, so no FFmpeg/PyAV dependency is needed for this format."""
         auth = self._auth()
         resp = requests.get(self.config.effective_url(), auth=auth, stream=True, timeout=10)
         resp.raise_for_status()
@@ -211,6 +234,10 @@ class StreamWorker(threading.Thread):
 
     # PyAV/FFmpeg: HTTP H.264/H.265, RTSP TCP/UDP/Multicast
     def _run_av(self, st: StreamType):
+        """Decode loop for http_video/rtsp_* via PyAV/FFmpeg. Handles the
+        video stream (with optional hardware-accelerated decoding) and, if
+        enabled and available, demuxes and plays an audio track through
+        sounddevice."""
         if not HAVE_PYAV:
             raise RuntimeError("PyAV ('av') is not installed: pip install av")
 
@@ -321,6 +348,8 @@ class StreamWorker(threading.Thread):
             container.close()
 
     def _auth(self):
+        """Return an (username, password) tuple for requests' basic auth,
+        or None if no credentials are configured."""
         if self.config.username:
             return (self.config.username, self.config.password)
         return None
@@ -349,6 +378,8 @@ class StreamWorker(threading.Thread):
         return urlunsplit((parts.scheme, new_netloc, parts.path, parts.query, parts.fragment))
 
     def _post_process(self, frame):
+        """Apply the configured decode scaling and rotation to a decoded
+        BGR frame before it is stored in the buffer / fed to the recorder."""
         cfg = self.config
         if cfg.scale != 1.0:
             frame = cv2.resize(frame, None, fx=cfg.scale, fy=cfg.scale,

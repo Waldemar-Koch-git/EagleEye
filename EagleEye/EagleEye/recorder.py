@@ -22,6 +22,9 @@ class StreamRecorder:
     PREFERRED_CODECS = ("libx264", "h264_videotoolbox", "mpeg4")
 
     def __init__(self, path: str, fps: float = 25.0):
+        """Prepare a recorder for the given output path. The actual encoder
+        and container are not opened yet (see _open), since width/height
+        are only known once the first frame arrives."""
         self.path = path
         self._fps = max(1.0, min(fps, 60.0))
         self._container = None
@@ -31,6 +34,9 @@ class StreamRecorder:
         self._frame_count = 0
 
     def _open(self, width, height):
+        """Open the output container and pick the first working encoder
+        from PREFERRED_CODECS for the given frame size. Called lazily on
+        the first call to write()."""
         self._container = av.open(self.path, mode="w")
         last_err = None
         for codec_name in self.PREFERRED_CODECS:
@@ -50,6 +56,10 @@ class StreamRecorder:
         self._stream.pix_fmt = "yuv420p"
 
     def write(self, bgr_frame):
+        """Encode and mux a single decoded BGR frame. Opens the container
+        lazily on the first call, then re-encodes and writes every
+        subsequent frame. Fails silently (logging the error) so a broken
+        recorder never brings down the decode thread feeding it."""
         with self._lock:
             if self._closed:
                 return
@@ -75,6 +85,8 @@ class StreamRecorder:
                 logger.exception("Error encoding frame (%s)", self.path)
 
     def close(self):
+        """Flush any buffered frames and close the output file. Safe to
+        call multiple times."""
         with self._lock:
             if self._closed:
                 return

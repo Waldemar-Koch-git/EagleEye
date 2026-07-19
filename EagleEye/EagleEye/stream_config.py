@@ -44,17 +44,23 @@ class StreamConfig:
     extra_options: dict = field(default_factory=dict)  # E.g. additional FFmpeg options
 
     def has_sub_stream(self) -> bool:
+        """Return True if a sub-stream URL has been configured."""
         return bool(self.sub_url.strip())
 
     def effective_url(self) -> str:
+        """Return the URL of the currently active variant (main or sub)."""
         if self.active_variant == "sub" and self.has_sub_stream():
             return self.sub_url
         return self.url
 
     def effective_stream_type(self) -> StreamType:
+        """Return the stream type of the currently active variant (main or sub)."""
         if self.active_variant == "sub" and self.has_sub_stream():
             return self.sub_stream_type
         return self.stream_type
 
     def other_variant(self) -> str:
+        """Return the name of the variant ("main"/"sub") that is not
+        currently active, i.e. the one switch_stream_variant() would
+        switch to."""
         return "sub" if self.active_variant == "main" else "main"

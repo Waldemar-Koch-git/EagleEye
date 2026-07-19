@@ -8,10 +8,8 @@ from dataclasses import asdict
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 from .camera_manager_dialog import CameraManagerDialog
-from .i18n import LANGUAGES, get_language, language_name, set_language, tr, translate_status
-
-LANGUAGE_PATH = os.path.expanduser("~/.EagleEye/language.json")
 from .frame_buffer import LatestFrameBuffer
+from .i18n import LANGUAGES, get_language, language_name, set_language, tr, translate_status
 from .settings_dialog import StreamSettingsDialog
 from .stream_config import StreamConfig
 from .stream_types import StreamType
@@ -21,6 +19,7 @@ from .video_widget import VideoWidget
 logger = logging.getLogger(__name__)
 
 CONFIG_PATH = os.path.expanduser("~/.EagleEye/config.json")
+LANGUAGE_PATH = os.path.expanduser("~/.EagleEye/language.json")
 RECORDINGS_DIR = os.path.expanduser("~/.EagleEye/recordings")
 # Window geometry, position and compact mode are stored in a small dedicated
 # file instead of config.json. This keeps the window state updated on every
@@ -33,6 +32,8 @@ class MainWindow(QtWidgets.QMainWindow):
     _status_signal = QtCore.pyqtSignal(str, str, dict)
 
     def __init__(self):
+        """Build the UI, then restore the saved language, window state and
+        stream configuration from disk (in that order)."""
         super().__init__()
         self.setWindowTitle(tr("app.title"))
         self.resize(1280, 800)
@@ -73,9 +74,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # ------------------------------------------------------------------
     def _build_ui(self):
+        """Construct the toolbars, grid container and status bar."""
         # Each category is its own toolbar so Qt can move, reorder, dock and
         # hide them independently via the built-in toolbar handling.
         def make_toolbar(title, object_name):
+            """Create and register a docked, movable toolbar."""
             tb = QtWidgets.QToolBar(title)
             tb.setObjectName(object_name)
             self.addToolBar(tb)
@@ -217,6 +220,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # Stream management
     # ------------------------------------------------------------------
     def add_stream_dialog(self):
+        """Open the settings dialog for a new camera and add it if accepted."""
         dlg = StreamSettingsDialog(parent=self)
         if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             cfg = dlg.get_config()
@@ -226,6 +230,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.add_stream(cfg)
 
     def add_stream(self, cfg: StreamConfig):
+        """Register a stream config, create its buffer/tile, start its
+        worker if enabled, and relayout the grid."""
         self.streams[cfg.id] = cfg
         buf = LatestFrameBuffer()
         self.buffers[cfg.id] = buf
@@ -259,6 +265,7 @@ class MainWindow(QtWidgets.QMainWindow):
         worker.start()
 
     def _stop_worker(self, stream_id):
+        """Stop and discard the decode thread for a stream, if running."""
         worker = self.workers.pop(stream_id, None)
         if worker:
             worker.stop()
@@ -317,9 +324,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self._relayout()
 
     def _make_select_handler(self, stream_id, widget):
+        """Wrap a tile's mousePressEvent so a plain click also marks it as
+        selected, without overriding VideoWidget's own drag/pan handling."""
         original = widget.mousePressEvent
 
         def handler(event):
+            """Mark this tile selected, then run the original handler."""
             self._selected_id = stream_id
             self._highlight_selected()
             original(event)
@@ -327,6 +337,7 @@ class MainWindow(QtWidgets.QMainWindow):
         return handler
 
     def _highlight_selected(self):
+        """Redraw the selection border on the currently selected tile."""
         for sid, w in self.widgets.items():
             if sid == self._selected_id:
                 w.setStyleSheet("background-color: black; border: 2px solid #2d8cf0;")
@@ -334,6 +345,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 w.setStyleSheet("background-color: black; border: none;")
 
     def remove_stream(self, stream_id):
+        """Stop the worker, remove the tile, and drop stream_id from all
+        bookkeeping structures."""
         if self._fullscreen_id == stream_id:
             self._fullscreen_id = None
         self._stop_worker(stream_id)
@@ -363,12 +376,16 @@ class MainWindow(QtWidgets.QMainWindow):
             self.remove_stream(stream_id)
 
     def remove_selected(self):
+        """Remove the currently selected camera, or the last one in the
+        order if nothing is explicitly selected."""
         if self._selected_id:
             self._confirm_and_remove(self._selected_id)
         elif self.order:
             self._confirm_and_remove(self.order[-1])
 
     def open_settings_for(self, stream_id):
+        """Open the settings dialog for an existing stream and apply any
+        accepted changes (restarting the worker as needed)."""
         cfg = self.streams.get(stream_id)
         if not cfg:
             return
@@ -388,6 +405,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 self._relayout()
 
     def _context_menu(self, stream_id, widget, pos):
+        """Build and show the right-click tile menu, then dispatch the
+        chosen action."""
         cfg = self.streams.get(stream_id)
         if not cfg:
             return
@@ -472,6 +491,8 @@ class MainWindow(QtWidgets.QMainWindow):
             widget.update()
 
     def toggle_recording(self, stream_id):
+        """Start or stop recording the given stream to an MP4 file under
+        RECORDINGS_DIR, named from the camera name and a timestamp."""
         worker = self.workers.get(stream_id)
         widget = self.widgets.get(stream_id)
         if not worker:
@@ -499,11 +520,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.status_bar.showMessage(tr("status.recording_started", path=path), 5000)
 
     def _on_worker_status(self, stream_id, status, extra):
+        """Worker-thread callback: re-emit the status as a Qt signal so the
+        actual GUI update happens safely on the GUI thread.
+        This is called from the worker thread."""
         # This is called from the worker thread. Emit only a Qt signal; the
         # actual GUI update happens on the GUI thread.
         self._status_signal.emit(stream_id, status, extra)
 
     def _handle_status_on_gui_thread(self, stream_id, status, extra):
+        """Apply a worker status update to its tile and the status bar.
+        Runs on the GUI thread via the _status_signal connection."""
         widget = self.widgets.get(stream_id)
         if widget:
             widget.set_status(status)
@@ -515,6 +541,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # Camera overview dialog
     # ------------------------------------------------------------------
     def open_camera_manager(self):
+        """Show the (lazily created) non-modal camera overview dialog."""
         if self._camera_manager_dialog is None:
             self._camera_manager_dialog = CameraManagerDialog(self, parent=self)
         self._camera_manager_dialog.refresh()
@@ -526,6 +553,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # Always on top
     # ------------------------------------------------------------------
     def _toggle_always_on_top(self, checked: bool):
+        """Enable or disable the always-on-top window flag."""
         flags = self.windowFlags()
         if checked:
             flags |= QtCore.Qt.WindowType.WindowStaysOnTopHint
@@ -538,6 +566,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # Layout handling
     # ------------------------------------------------------------------
     def _toggle_hide_disabled(self, checked: bool):
+        """Toggle whether disabled cameras are removed from the grid entirely."""
         self.hide_disabled = checked
         self._relayout()
 
@@ -555,17 +584,20 @@ class MainWindow(QtWidgets.QMainWindow):
             self.status_bar.setVisible(True)
 
     def _on_mode_changed(self, idx):
+        """Switch between dynamic and fixed grid layout mode."""
         self.layout_mode = self.mode_combo.itemData(idx) or "dynamic"
         self.cols_spin.setEnabled(self.layout_mode == "fixed")
         self.rows_spin.setEnabled(self.layout_mode == "fixed")
         self._relayout()
 
     def _on_fixed_grid_changed(self):
+        """Apply new fixed column/row counts from the toolbar spin boxes."""
         self.fixed_cols = self.cols_spin.value()
         self.fixed_rows = self.rows_spin.value()
         self._relayout()
 
     def resizeEvent(self, event):
+        """Debounce a dynamic-grid relayout while the window is being resized."""
         super().resizeEvent(event)
         if self.layout_mode == "dynamic" and self.order:
             self._resize_relayout_timer.start(120)
@@ -598,6 +630,9 @@ class MainWindow(QtWidgets.QMainWindow):
         return best_cols, best_rows
 
     def _relayout(self):
+        """Rebuild the grid: handles single-tile fullscreen mode, the
+        hide-disabled filter, and placing/stretching tiles for the current
+        layout mode (dynamic or fixed)."""
         while self.grid_layout.count():
             item = self.grid_layout.takeAt(0)
             w = item.widget()
@@ -680,12 +715,15 @@ class MainWindow(QtWidgets.QMainWindow):
     # ------------------------------------------------------------------
     @staticmethod
     def _cfg_to_dict(cfg: StreamConfig) -> dict:
+        """Convert a StreamConfig to a JSON-serializable dict, turning its
+        StreamType enum fields into their plain string values."""
         d = asdict(cfg)
         d["stream_type"] = cfg.stream_type.value
         d["sub_stream_type"] = cfg.sub_stream_type.value
         return d
 
     def _save_config(self):
+        """Write layout mode and all stream configs to CONFIG_PATH."""
         os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
         data = {
             "layout_mode": self.layout_mode,
@@ -699,6 +737,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.status_bar.showMessage(tr("status.saved", path=CONFIG_PATH), 3000)
 
     def _load_language(self):
+        """Restore the previously selected UI language, if saved."""
         if not os.path.exists(LANGUAGE_PATH):
             return
         try:
@@ -713,6 +752,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
 
     def _save_language(self):
+        """Persist the currently active UI language to LANGUAGE_PATH."""
         try:
             os.makedirs(os.path.dirname(LANGUAGE_PATH), exist_ok=True)
             data = {"language": get_language()}
@@ -722,6 +762,8 @@ class MainWindow(QtWidgets.QMainWindow):
             logger.warning("Language preference could not be saved", exc_info=True)
 
     def _load_config(self):
+        """Restore layout mode and all stream configs from CONFIG_PATH,
+        recreating a worker/tile for each saved stream."""
         if not os.path.exists(CONFIG_PATH):
             return
         try:
@@ -751,6 +793,8 @@ class MainWindow(QtWidgets.QMainWindow):
     # restored at startup.
     # ------------------------------------------------------------------
     def _save_window_state(self):
+        """Persist window geometry, toolbar layout and compact-mode state
+        to WINDOW_STATE_PATH, if "remember window" is enabled."""
         if not self.remember_window:
             return
         try:
@@ -768,6 +812,8 @@ class MainWindow(QtWidgets.QMainWindow):
             logger.warning("Window state could not be saved", exc_info=True)
 
     def _load_window_state(self):
+        """Restore window geometry, toolbar layout and compact-mode state
+        from WINDOW_STATE_PATH, if "remember window" is enabled."""
         if not self.remember_window or not os.path.exists(WINDOW_STATE_PATH):
             return
         try:
@@ -795,6 +841,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.compact_action.setChecked(data.get("compact_mode", False))
 
     def closeEvent(self, event):
+        """Persist window state, close child dialogs and stop all workers
+        before the application exits."""
         self._save_window_state()
         for dlg in (self._camera_manager_dialog,):
             if dlg is not None:
