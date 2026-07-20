@@ -1,8 +1,8 @@
-# EagleEye
+# 🦅EagleEye👁
 
 **Lightweight, cross-platform multi-camera stream viewer, built with Python and PyQt6.**
 
-EagleEye lets you monitor several IP cameras at once in a single window — RTSP, MJPEG, HTTP video or plain snapshot polling — with recording, digital zoom, audio playback and a layout that adapts to however you size the window.
+EagleEye lets you monitor several IP cameras at once in a single window - RTSP, MJPEG, HTTP video or plain snapshot polling - with recording, digital zoom, audio playback and a layout that adapts to however you size the window.
 
 ![Preview](./images_/preview.jpg)
 
@@ -40,7 +40,7 @@ FFmpeg install usually **isn't** required.
 pip install sounddevice
 ```
 
-If `sounddevice` isn't installed, EagleEye keeps working normally — audio
+If `sounddevice` isn't installed, EagleEye keeps working normally - audio
 is simply skipped (video, recording, etc. are unaffected).
 
 ### Requirements
@@ -71,7 +71,7 @@ tile) to return to the normal grid view.
 **Camera overview:** The "Camera overview" toolbar button opens a separate,
 non-modal window listing all configured cameras (name, type, main URL,
 sub-stream, active state). Cameras can be added, edited, enabled/disabled
-and removed from there — changes apply immediately to the live view.
+and removed from there - changes apply immediately to the live view.
 
 **Main / sub stream:** In the settings dialog you can set a sub-stream URL
 in addition to the main one (e.g. a lower-resolution RTSP variant).
@@ -79,7 +79,7 @@ Right-click a tile → "Switch to sub/main stream" to switch live between the
 two (the decode worker is restarted cleanly).
 
 **Enable / disable a stream:** Via the tile's right-click menu or the
-camera overview (the worker thread is stopped or restarted — no background
+camera overview (the worker thread is stopped or restarted - no background
 load for disabled cameras). There's deliberately no button directly on the
 tile, to avoid accidental clicks.
 
@@ -88,7 +88,7 @@ tile, to avoid accidental clicks.
 
 **Layout:**
 - *Dynamic*: columns/rows are chosen from the actual window size (not a
-  rigid `ceil(sqrt(n))`) — it picks the combination that gives the tiles
+  rigid `ceil(sqrt(n))`) - it picks the combination that gives the tiles
   (assumed 16:9) the most area. A narrow/tall window therefore automatically
   gets more rows and fewer columns instead of squeezing everything sideways.
   Adjusts live while you drag the window edge.
@@ -97,7 +97,7 @@ tile, to avoid accidental clicks.
 - Tiles can be reordered via **drag & drop** directly in the grid.
 
 **Hide disabled:** Toolbar toggle "Hide disabled" removes paused cameras
-from the grid entirely, instead of leaving them black and taking up space —
+from the grid entirely, instead of leaving them black and taking up space -
 the layout automatically adapts to the remaining active streams.
 
 **Compact mode:** Toolbar toggle or **F11** hides the toolbars and status
@@ -124,7 +124,7 @@ adding/editing a camera via the `show_fps` checkbox in the settings dialog.
 
 **Zoom:** Hold the mouse over a tile and scroll with **Ctrl+mouse wheel**
 to enlarge/shrink the visible crop, centered on the cursor position
-(digital zoom up to 6x). Display-side only — only the already-decoded frame
+(digital zoom up to 6x). Display-side only - only the already-decoded frame
 is cropped before drawing, with no effect on decoding, network load or
 recording. While zoomed, the crop can additionally be moved by holding
 **Ctrl+left-click and dragging** (deliberately tied to Ctrl so it doesn't
@@ -133,11 +133,11 @@ clash with the normal left-click drag used to reorder tiles). Right-click →
 
 **Audio:** Enable per stream (`audio_enabled` in the settings dialog, only
 relevant for RTSP/HTTP video with an audio track). Deliberately only one
-stream plays audio at a time to avoid mixing audio tracks — enabling audio
+stream plays audio at a time to avoid mixing audio tracks - enabling audio
 for one stream automatically mutes all others. Requires the optional
 `sounddevice` package (see Installation).
 
-**Remember window state:** Toolbar toggle "Remember window state" — when
+**Remember window state:** Toolbar toggle "Remember window state" - when
 active, "Save" additionally stores window position, size and whether
 compact mode was active; both are restored automatically on next launch.
 When the toggle is off, EagleEye always starts at the default size in
@@ -151,7 +151,7 @@ loaded automatically on the next start.
 ## Architecture / Performance Principles
 
 - **One thread per stream** (no GIL bottleneck, since decoding runs in
-  native code — FFmpeg via PyAV, or OpenCV/libjpeg — which releases the GIL)
+  native code - FFmpeg via PyAV, or OpenCV/libjpeg - which releases the GIL)
 - **"Latest-frame-only" buffer** instead of a queue: no backlog of old
   frames ever builds up → constant low latency and constant memory usage,
   regardless of how fast the source delivers frames (`frame_buffer.py`)
@@ -190,7 +190,7 @@ EagleEye_project/
 ## Language
 
 The UI defaults to **English** and can be switched at runtime from the
-"Window" toolbar — currently **German** is also available. The active
+"Window" toolbar - currently **German** is also available. The active
 language is remembered between sessions (`~/.EagleEye/language.json`).
 Adding another language means adding one more dictionary to
 `EagleEye/i18n.py`.
@@ -205,7 +205,7 @@ Adding another language means adding one more dictionary to
 - ✅ Recording per stream
 - ✅ Audio playback for streams with an audio track
 - ✅ Drag & drop tile reordering
-- ✅ Compact mode (F11) — only camera tiles visible, reversible
+- ✅ Compact mode (F11) - only camera tiles visible, reversible
 - ✅ Dynamic grid based on actual window size (instead of a rigid
   `ceil(sqrt(n))`), tiles stack sensibly in narrow windows
 - ✅ Window position, size and compact mode optionally saved/restored
@@ -225,7 +225,7 @@ Adding another language means adding one more dictionary to
 
 ## License
 
-This project is licensed under a custom non-commercial license — see
+This project is licensed under a custom non-commercial license - see
 [LICENSE](LICENSE). Non-commercial use, copying and modification are
 permitted; commercial use requires prior written permission from the
 author.
