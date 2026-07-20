@@ -10,7 +10,7 @@ LANGUAGES = {
 
 _TRANSLATIONS = {
     "en": {
-        "app.title": "▷ EagleEye - Multi-Stream Viewer | F11 → Toggle compact mode",
+        "app.title": "🦅EagleEye - Multi-Stream Viewer | F11 → Toggle compact mode",
         "toolbar.cameras": "Cameras",
         "toolbar.layout": "Layout",
         "toolbar.window": "Window",
@@ -121,7 +121,7 @@ _TRANSLATIONS = {
         "display.zoom": "x",
     },
     "de": {
-        "app.title": "▷ EagleEye - Multi-Stream Viewer | F11 → Kompaktmodus wechseln",
+        "app.title": "🦅EagleEye - Multi-Stream Viewer | F11 → Kompaktmodus wechseln",
         "toolbar.cameras": "Kameras",
         "toolbar.layout": "Layout",
         "toolbar.window": "Fenster",
